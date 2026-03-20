@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VCare Website</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(135deg, #f4f9ff, #eefbf3);
+        color: #163046;
+      }
+      .wrap {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      .card {
+        width: min(760px, 100%);
+        background: #ffffff;
+        border: 1px solid #dbe7f5;
+        border-radius: 16px;
+        box-shadow: 0 12px 30px rgba(22, 48, 70, 0.08);
+        padding: 28px;
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 34px;
+      }
+      p {
+        margin: 8px 0;
+        line-height: 1.6;
+      }
+      .links {
+        margin-top: 18px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      a.btn {
+        text-decoration: none;
+        border: 1px solid #0f67b6;
+        background: #0f67b6;
+        color: #ffffff;
+        font-weight: 600;
+        border-radius: 10px;
+        padding: 10px 14px;
+        display: inline-block;
+      }
+      a.btn.alt {
+        background: #ffffff;
+        color: #0f67b6;
+      }
+      .small {
+        margin-top: 20px;
+        font-size: 13px;
+        color: #58738a;
+      }
+      code {
+        background: #f2f8ff;
+        border: 1px solid #d8e7fb;
+        border-radius: 6px;
+        padding: 2px 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <h1>VCare Website</h1>
+        <p>
+          This GitHub Pages site is a public landing page for the VCare project.
+        </p>
+        <p>
+          The full VCare application uses Next.js server features, API routes, and
+          Prisma. For full production runtime, deploy the app to a server platform
+          like Vercel.
+        </p>
+
+        <div class="links">
+          <a class="btn" href="https://github.com/nghuax/vcare-website" target="_blank" rel="noreferrer">Source Code</a>
+          <a class="btn alt" href="https://github.com/nghuax/vcare-website/blob/main/DEPLOY_VERCEL.md" target="_blank" rel="noreferrer">Full Deploy Guide</a>
+        </div>
+
+        <p class="small">
+          Live Pages URL: <code>https://nghuax.github.io/vcare-website/</code>
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
