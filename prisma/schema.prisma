@@ -1,0 +1,643 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PATIENT
+  STAFF
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum StaffRole {
+  CARE_COORDINATOR
+  PHARMACY_SUPPORT
+  INSURANCE_SUPPORT
+  ADMINISTRATOR
+}
+
+enum FamilyRelationship {
+  SPOUSE
+  CHILD
+  PARENT
+  SIBLING
+  CAREGIVER
+  OTHER
+}
+
+enum PrescriptionStatus {
+  UPLOADED
+  REVIEW_IN_PROGRESS
+  ACTIVE
+  REJECTED
+  EXPIRED
+  ARCHIVED
+}
+
+enum InsuranceVerificationStatus {
+  NOT_SUBMITTED
+  SUBMITTED
+  IN_REVIEW
+  VERIFIED
+  REJECTED
+  NEEDS_INFORMATION
+  CLOSED
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DoctorStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AvailabilitySlotStatus {
+  OPEN
+  HELD
+  BOOKED
+  CANCELED
+}
+
+enum MedicineStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DosageScheduleStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum RefillCycleStatus {
+  TRACKING
+  DUE
+  REQUESTED
+  FULFILLED
+  PAUSED
+}
+
+enum AppointmentRequestStatus {
+  REQUESTED
+  REVIEWED_BY_STAFF
+  READY_FOR_BOOKING
+  CONFIRMED
+  COMPLETED
+  CANCELED
+}
+
+enum OrderStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED_BY_STAFF
+  READY_FOR_PICKUP
+  DELIVERED
+  CANCELED
+}
+
+enum OrderFulfillmentMethod {
+  PICKUP
+  DELIVERY
+}
+
+enum InsuranceDocumentType {
+  CARD_FRONT
+  CARD_BACK
+  SUPPORTING_DOCUMENT
+  INSURANCE_CARD
+  ID_DOCUMENT
+  REFERRAL
+  OTHER
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  READ
+  FAILED
+}
+
+enum PartnerOrganizationType {
+  PHARMACY
+  CLINIC
+  HOSPITAL
+  OTHER
+}
+
+enum PartnerInquiryStatus {
+  NEW
+  REVIEWED_BY_STAFF
+  CONTACTED
+  QUALIFIED
+  ACTIVE_PARTNER
+  CLOSED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  fullName     String
+  phone        String?    @unique
+  role         UserRole   @default(PATIENT)
+  status       UserStatus @default(ACTIVE)
+  locale       String     @default("vi-VN")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  staffUser                    StaffUser?
+  familyMembers                FamilyMember[]              @relation("FamilyMembersOwner")
+  linkedFamilyMembers          FamilyMember[]              @relation("FamilyMemberLinkedUser")
+  uploadedPrescriptions        Prescription[]              @relation("PrescriptionUploadedBy")
+  patientPrescriptions         Prescription[]              @relation("PrescriptionPatient")
+  reviewedPrescriptions        Prescription[]              @relation("PrescriptionReviewedByStaff")
+  uploadedPrescriptionImages   PrescriptionImage[]         @relation("PrescriptionImageUploadedBy")
+  insuranceRecords             InsuranceRecord[]           @relation("InsuranceRecordPatient")
+  reviewedInsuranceRecords     InsuranceRecord[]           @relation("InsuranceRecordReviewedByStaff")
+  verifiedInsuranceRecords     InsuranceRecord[]           @relation("InsuranceRecordVerifiedByStaff")
+  insuranceDocuments           InsuranceDocument[]         @relation("InsuranceDocumentUploadedBy")
+  insuranceVerificationNotes   InsuranceVerificationNote[] @relation("InsuranceVerificationNoteCreatedByStaff")
+  appointmentRequests          AppointmentRequest[]        @relation("AppointmentRequestPatient")
+  reviewedAppointmentRequests  AppointmentRequest[]        @relation("AppointmentRequestReviewedByStaff")
+  orders                       Order[]                     @relation("OrderPatient")
+  reviewedOrders               Order[]                     @relation("OrderReviewedByStaff")
+  reviewedRefillCycles         RefillCycle[]               @relation("RefillCycleReviewedByStaff")
+  consultationNotes            ConsultationNote[]          @relation("ConsultationNotePatient")
+  reviewedConsultationNotes    ConsultationNote[]          @relation("ConsultationNoteReviewedByStaff")
+  medicationIntakeLogs         MedicationIntakeLog[]
+  notifications                Notification[]
+  createdPartnerOrganizations  PartnerOrganization[]       @relation("PartnerOrganizationCreatedBy")
+  reviewedPartnerOrganizations PartnerOrganization[]       @relation("PartnerOrganizationReviewedBy")
+}
+
+model StaffUser {
+  id         String    @id @default(cuid())
+  userId     String    @unique
+  staffCode  String?   @unique
+  staffRole  StaffRole @default(CARE_COORDINATOR)
+  title      String?
+  department String?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FamilyMember {
+  id            String             @id @default(cuid())
+  patientUserId String
+  linkedUserId  String?
+  fullName      String
+  relationship  FamilyRelationship
+  dateOfBirth   DateTime?
+  phone         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  patientUser         User                 @relation("FamilyMembersOwner", fields: [patientUserId], references: [id], onDelete: Cascade)
+  linkedUser          User?                @relation("FamilyMemberLinkedUser", fields: [linkedUserId], references: [id], onDelete: SetNull)
+  appointmentRequests AppointmentRequest[]
+
+  @@index([patientUserId, relationship])
+}
+
+model Prescription {
+  id                          String                      @id @default(cuid())
+  patientUserId               String
+  uploadedByUserId            String
+  reviewedByStaffId           String?
+  hospitalId                  String?
+  clinicId                    String?
+  doctorId                    String?
+  prescriptionReference       String?                     @unique
+  uploadedPrescriptionAt      DateTime                    @default(now())
+  insuranceVerificationStatus InsuranceVerificationStatus @default(NOT_SUBMITTED)
+  status                      PrescriptionStatus          @default(UPLOADED)
+  reviewedAt                  DateTime?
+  notes                       String?
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime                    @updatedAt
+
+  patientUser          User                  @relation("PrescriptionPatient", fields: [patientUserId], references: [id], onDelete: Cascade)
+  uploadedBy           User                  @relation("PrescriptionUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  reviewedByStaff      User?                 @relation("PrescriptionReviewedByStaff", fields: [reviewedByStaffId], references: [id], onDelete: SetNull)
+  hospital             Hospital?             @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  clinic               Clinic?               @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+  doctor               Doctor?               @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  images               PrescriptionImage[]
+  insuranceRecords     InsuranceRecord[]
+  dosageSchedules      DosageSchedule[]
+  medicationIntakeLogs MedicationIntakeLog[]
+  refillCycles         RefillCycle[]
+  appointmentRequests  AppointmentRequest[]
+  orders               Order[]
+  consultationNotes    ConsultationNote[]
+
+  @@index([patientUserId, status])
+  @@index([insuranceVerificationStatus])
+}
+
+model PrescriptionImage {
+  id               String   @id @default(cuid())
+  prescriptionId   String
+  uploadedByUserId String
+  imageUrl         String
+  imageLabel       String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  uploadedBy   User         @relation("PrescriptionImageUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([prescriptionId])
+}
+
+model InsuranceRecord {
+  id                          String                      @id @default(cuid())
+  patientUserId               String
+  prescriptionId              String?
+  insuranceProviderName       String
+  cardholderName              String
+  insuranceNumber             String
+  registeredHospitalName      String?
+  insuranceExpiryDate         DateTime?
+  memberId                    String?
+  policyNumber                String?
+  insuranceVerificationStatus InsuranceVerificationStatus @default(SUBMITTED)
+  reviewedByStaffId           String?
+  verifiedByStaffId           String?
+  submittedAt                 DateTime                    @default(now())
+  reviewedAt                  DateTime?
+  verifiedAt                  DateTime?
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime                    @updatedAt
+
+  patientUser       User                        @relation("InsuranceRecordPatient", fields: [patientUserId], references: [id], onDelete: Cascade)
+  prescription      Prescription?               @relation(fields: [prescriptionId], references: [id], onDelete: SetNull)
+  reviewedByStaff   User?                       @relation("InsuranceRecordReviewedByStaff", fields: [reviewedByStaffId], references: [id], onDelete: SetNull)
+  verifiedByStaff   User?                       @relation("InsuranceRecordVerifiedByStaff", fields: [verifiedByStaffId], references: [id], onDelete: SetNull)
+  documents         InsuranceDocument[]
+  verificationNotes InsuranceVerificationNote[]
+
+  @@index([patientUserId, insuranceVerificationStatus])
+  @@index([reviewedByStaffId])
+  @@index([verifiedByStaffId])
+}
+
+model InsuranceDocument {
+  id                String                @id @default(cuid())
+  insuranceRecordId String
+  uploadedByUserId  String
+  documentType      InsuranceDocumentType
+  fileUrl           String
+  fileName          String
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  insuranceRecord InsuranceRecord @relation(fields: [insuranceRecordId], references: [id], onDelete: Cascade)
+  uploadedBy      User            @relation("InsuranceDocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([insuranceRecordId, documentType])
+}
+
+model InsuranceVerificationNote {
+  id                String   @id @default(cuid())
+  insuranceRecordId String
+  createdByStaffId  String
+  note              String
+  isPatientVisible  Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  insuranceRecord InsuranceRecord @relation(fields: [insuranceRecordId], references: [id], onDelete: Cascade)
+  createdByStaff  User            @relation("InsuranceVerificationNoteCreatedByStaff", fields: [createdByStaffId], references: [id], onDelete: Restrict)
+
+  @@index([insuranceRecordId, createdAt])
+}
+
+model Hospital {
+  id               String             @id @default(cuid())
+  name             String
+  code             String?            @unique
+  addressLine      String?
+  city             String?
+  status           OrganizationStatus @default(ACTIVE)
+  isBookingVisible Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  clinics              Clinic[]
+  doctors              Doctor[]
+  prescriptions        Prescription[]
+  appointmentRequests  AppointmentRequest[]
+  partnerOrganizations PartnerOrganization[]
+}
+
+model Clinic {
+  id               String             @id @default(cuid())
+  hospitalId       String?
+  name             String
+  code             String?            @unique
+  addressLine      String?
+  city             String?
+  status           OrganizationStatus @default(ACTIVE)
+  isBookingVisible Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  hospital             Hospital?                @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  doctors              Doctor[]
+  availabilitySlots    DoctorAvailabilitySlot[]
+  prescriptions        Prescription[]
+  appointmentRequests  AppointmentRequest[]
+  partnerOrganizations PartnerOrganization[]
+
+  @@index([hospitalId])
+}
+
+model Doctor {
+  id                  String       @id @default(cuid())
+  hospitalId          String?
+  clinicId            String?
+  fullName            String
+  specialty           String?
+  licenseNumber       String?      @unique
+  doctorInformation   String?
+  consultationFeeNote String?
+  profileImageUrl     String?
+  yearsOfExperience   Int?
+  status              DoctorStatus @default(ACTIVE)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  hospital            Hospital?                @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  clinic              Clinic?                  @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+  reviewSummary       DoctorReviewSummary?
+  availabilitySlots   DoctorAvailabilitySlot[]
+  prescriptions       Prescription[]
+  appointmentRequests AppointmentRequest[]
+  consultationNotes   ConsultationNote[]
+
+  @@index([hospitalId, clinicId])
+}
+
+model DoctorReviewSummary {
+  id             String   @id @default(cuid())
+  doctorId       String   @unique
+  averageRating  Float    @default(0)
+  reviewCount    Int      @default(0)
+  punctuality    Float    @default(0)
+  communication  Float    @default(0)
+  supportiveness Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+model DoctorAvailabilitySlot {
+  id        String                 @id @default(cuid())
+  doctorId  String
+  clinicId  String?
+  startsAt  DateTime
+  endsAt    DateTime
+  status    AvailabilitySlotStatus @default(OPEN)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  doctor              Doctor              @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  clinic              Clinic?             @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+  bookedByAppointment AppointmentRequest? @relation("AppointmentSelectedSlot")
+
+  @@unique([doctorId, startsAt])
+  @@index([doctorId, startsAt, status])
+}
+
+model Medicine {
+  id               String         @id @default(cuid())
+  code             String?        @unique
+  name             String
+  genericName      String?
+  strength         String?
+  dosageForm       String?
+  manufacturerName String?
+  status           MedicineStatus @default(ACTIVE)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  dosageSchedules DosageSchedule[]
+  refillCycles    RefillCycle[]
+  orders          Order[]
+}
+
+model DosageSchedule {
+  id                String               @id @default(cuid())
+  prescriptionId    String
+  medicineId        String
+  dosageInstruction String?
+  timesPerDay       Int?
+  timingLabel       String?
+  startDate         DateTime?
+  endDate           DateTime?
+  status            DosageScheduleStatus @default(ACTIVE)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  prescription Prescription          @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  medicine     Medicine              @relation(fields: [medicineId], references: [id], onDelete: Restrict)
+  intakeLogs   MedicationIntakeLog[]
+
+  @@unique([prescriptionId, medicineId])
+  @@index([prescriptionId, status])
+}
+
+model MedicationIntakeLog {
+  id               String   @id @default(cuid())
+  patientUserId    String
+  prescriptionId   String
+  dosageScheduleId String
+  intakeAt         DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  patientUser    User           @relation(fields: [patientUserId], references: [id], onDelete: Cascade)
+  prescription   Prescription   @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  dosageSchedule DosageSchedule @relation(fields: [dosageScheduleId], references: [id], onDelete: Cascade)
+
+  @@index([patientUserId, intakeAt])
+  @@index([dosageScheduleId])
+}
+
+model RefillCycle {
+  id                String            @id @default(cuid())
+  prescriptionId    String
+  medicineId        String
+  reviewedByStaffId String?
+  cycleDays         Int
+  nextRefillAt      DateTime?
+  lastRefillAt      DateTime?
+  status            RefillCycleStatus @default(TRACKING)
+  reviewedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  prescription    Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  medicine        Medicine     @relation(fields: [medicineId], references: [id], onDelete: Restrict)
+  reviewedByStaff User?        @relation("RefillCycleReviewedByStaff", fields: [reviewedByStaffId], references: [id], onDelete: SetNull)
+
+  @@unique([prescriptionId, medicineId])
+  @@index([status, nextRefillAt])
+}
+
+model AppointmentRequest {
+  id                        String                   @id @default(cuid())
+  patientUserId             String
+  familyMemberId            String?
+  doctorId                  String?
+  hospitalId                String?
+  clinicId                  String?
+  prescriptionId            String?
+  selectedSlotId            String?                  @unique
+  reviewedByStaffId         String?
+  requestedAt               DateTime                 @default(now())
+  requestedForAt            DateTime?
+  status                    AppointmentRequestStatus @default(REQUESTED)
+  appointmentRequestNote    String?
+  doctorInformationSnapshot Json?
+  reviewedAt                DateTime?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+
+  patientUser       User                    @relation("AppointmentRequestPatient", fields: [patientUserId], references: [id], onDelete: Cascade)
+  familyMember      FamilyMember?           @relation(fields: [familyMemberId], references: [id], onDelete: SetNull)
+  doctor            Doctor?                 @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  hospital          Hospital?               @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  clinic            Clinic?                 @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+  prescription      Prescription?           @relation(fields: [prescriptionId], references: [id], onDelete: SetNull)
+  selectedSlot      DoctorAvailabilitySlot? @relation("AppointmentSelectedSlot", fields: [selectedSlotId], references: [id], onDelete: SetNull)
+  reviewedByStaff   User?                   @relation("AppointmentRequestReviewedByStaff", fields: [reviewedByStaffId], references: [id], onDelete: SetNull)
+  consultationNotes ConsultationNote[]
+  orders            Order[]
+
+  @@index([patientUserId, status])
+  @@index([doctorId, requestedForAt])
+}
+
+model Order {
+  id                   String                 @id @default(cuid())
+  orderNumber          String?                @unique
+  patientUserId        String
+  prescriptionId       String?
+  appointmentRequestId String?
+  medicineId           String?
+  reviewedByStaffId    String?
+  quantity             Int?
+  fulfillmentMethod    OrderFulfillmentMethod @default(PICKUP)
+  deliveryAddress      String?
+  requestNote          String?
+  status               OrderStatus            @default(DRAFT)
+  submittedAt          DateTime?
+  reviewedAt           DateTime?
+  fulfilledAt          DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  patientUser        User                @relation("OrderPatient", fields: [patientUserId], references: [id], onDelete: Cascade)
+  prescription       Prescription?       @relation(fields: [prescriptionId], references: [id], onDelete: SetNull)
+  appointmentRequest AppointmentRequest? @relation(fields: [appointmentRequestId], references: [id], onDelete: SetNull)
+  medicine           Medicine?           @relation(fields: [medicineId], references: [id], onDelete: SetNull)
+  reviewedByStaff    User?               @relation("OrderReviewedByStaff", fields: [reviewedByStaffId], references: [id], onDelete: SetNull)
+
+  @@index([patientUserId, status])
+  @@index([reviewedByStaffId])
+}
+
+model ConsultationNote {
+  id                   String    @id @default(cuid())
+  patientUserId        String
+  doctorId             String?
+  appointmentRequestId String?
+  prescriptionId       String?
+  reviewedByStaffId    String?
+  summary              String
+  doctorInformation    String?
+  reviewedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  patientUser        User                @relation("ConsultationNotePatient", fields: [patientUserId], references: [id], onDelete: Cascade)
+  doctor             Doctor?             @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  appointmentRequest AppointmentRequest? @relation(fields: [appointmentRequestId], references: [id], onDelete: SetNull)
+  prescription       Prescription?       @relation(fields: [prescriptionId], references: [id], onDelete: SetNull)
+  reviewedByStaff    User?               @relation("ConsultationNoteReviewedByStaff", fields: [reviewedByStaffId], references: [id], onDelete: SetNull)
+
+  @@index([patientUserId, createdAt])
+}
+
+model Notification {
+  id                String              @id @default(cuid())
+  userId            String
+  title             String
+  body              String
+  channel           NotificationChannel @default(IN_APP)
+  status            NotificationStatus  @default(QUEUED)
+  relatedEntityType String?
+  relatedEntityId   String?
+  scheduledAt       DateTime?
+  sentAt            DateTime?
+  readAt            DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model PartnerOrganization {
+  id                String                  @id @default(cuid())
+  name              String
+  organizationType  PartnerOrganizationType
+  contactName       String
+  contactEmail      String
+  contactPhone      String?
+  websiteUrl        String?
+  inquiryMessage    String?
+  inquiryStatus     PartnerInquiryStatus    @default(NEW)
+  createdByUserId   String?
+  reviewedByStaffId String?
+  hospitalId        String?
+  clinicId          String?
+  contactedAt       DateTime?
+  reviewedAt        DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  createdByUser   User?     @relation("PartnerOrganizationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  reviewedByStaff User?     @relation("PartnerOrganizationReviewedBy", fields: [reviewedByStaffId], references: [id], onDelete: SetNull)
+  hospital        Hospital? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  clinic          Clinic?   @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+
+  @@index([organizationType, inquiryStatus])
+}
