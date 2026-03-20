@@ -11,5 +11,3 @@ Separated VCare web app (public + patient + admin portals)
 - `(patient)`
 - `(admin)`
 - `api/*`
-
-
